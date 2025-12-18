@@ -299,7 +299,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col md:flex-row relative selection:bg-stone-200 overflow-hidden bg-[#F9F7F2]">
+    <div className="min-h-screen pb-20 md:pb-0 flex flex-col md:flex-row relative selection:bg-stone-200 overflow-x-hidden">
       {/* --- Japandi Background --- */}
       <div className="japandi-bg-container"></div>
       <div className="paper-overlay"></div>
@@ -442,7 +442,7 @@ const App: React.FC = () => {
         </aside>
 
         {/* --- Mobile Header --- */}
-        <header className="md:hidden z-30 px-6 pb-4 animate-fade-in bg-[#F9F7F2] pt-[calc(1.5rem+env(safe-area-inset-top))]">
+        <header className="md:hidden sticky top-0 z-30 px-6 pb-4 animate-fade-in bg-[#F9F7F2] pt-[calc(1.5rem+env(safe-area-inset-top))]">
           <div className="bg-white/90 backdrop-blur-md p-4 flex justify-between items-center shadow-sm border border-[#8E8679]/20 rounded-xl">
             <div>
               <h1 className="text-xl font-black text-[#333333] tracking-tight uppercase">
@@ -492,7 +492,7 @@ const App: React.FC = () => {
         </header>
 
         {/* --- Main Content --- */}
-        <main className="flex-1 p-4 pb-24 md:p-12 overflow-y-auto z-10 w-full relative">
+        <main className="flex-1 p-4 md:p-12 overflow-y-auto z-10">
           <div className="max-w-4xl mx-auto">
 
             {/* Calendar Navigation */}
