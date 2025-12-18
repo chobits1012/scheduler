@@ -429,20 +429,32 @@ const App: React.FC = () => {
           <div className="max-w-4xl mx-auto">
 
             {/* Calendar Navigation */}
-            <div className="flex items-center justify-between mb-12 animate-fade-in px-2">
-              <button onClick={() => changeMonth(-1)} className="w-12 h-12 border border-[#8E8679]/30 text-[#8E8679] hover:text-[#333333] flex items-center justify-center transition-all bg-white/40 rounded-lg">
-                <ChevronLeft size={20} />
+            <div className="flex items-center justify-between mb-8 md:mb-12 animate-fade-in px-2">
+              <button onClick={() => changeMonth(-1)} className="w-10 h-10 md:w-12 md:h-12 border border-[#8E8679]/30 text-[#8E8679] hover:text-[#333333] flex items-center justify-center transition-all bg-white/40 rounded-lg">
+                <ChevronLeft size={16} className="md:w-5 md:h-5" />
               </button>
               <div className="text-center">
-                <div className="wood-plaque px-10 py-3">
-                  <h2 className="text-xl font-black text-[#DCC7A1] tracking-[0.4em] uppercase">
+                <div className="wood-plaque px-5 py-2 md:px-10 md:py-3 shadow-lg transform transition-all hover:scale-105">
+                  <h2 className="text-sm md:text-xl font-black text-[#DCC7A1] tracking-[0.2em] md:tracking-[0.4em] uppercase whitespace-nowrap">
                     {currentDate.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' })}
                   </h2>
                 </div>
               </div>
-              <button onClick={() => changeMonth(1)} className="w-12 h-12 border border-[#8E8679]/30 text-[#8E8679] hover:text-[#333333] flex items-center justify-center transition-all bg-white/40 rounded-lg">
-                <ChevronRight size={20} />
+              <button onClick={() => changeMonth(1)} className="w-10 h-10 md:w-12 md:h-12 border border-[#8E8679]/30 text-[#8E8679] hover:text-[#333333] flex items-center justify-center transition-all bg-white/40 rounded-lg">
+                <ChevronRight size={16} className="md:w-5 md:h-5" />
               </button>
+            </div>
+
+            {/* Mobile Stats Summary */}
+            <div className="md:hidden mb-6 bg-white p-4 rounded-xl border border-[#8E8679]/20 shadow-sm flex items-center justify-between animate-slide-up">
+              <div>
+                <div className="text-[8px] font-black text-[#8E8679] uppercase tracking-[0.2em] mb-1">Total Income</div>
+                <div className="text-2xl font-black text-[#333333] tracking-tight font-mono">${currentMonthStats.totalIncome.toLocaleString()}</div>
+              </div>
+              <div className="flex flex-col gap-1 text-[9px] font-black text-[#8E8679] tracking-tighter items-end">
+                <div className="bg-[#F9F7F2] px-2 py-1 rounded flex items-center gap-1 w-fit"><Clock size={10} /> {currentMonthStats.totalHours}H</div>
+                <div className="bg-[#F9F7F2] px-2 py-1 rounded flex items-center gap-1 w-fit"><Ticket size={10} /> {currentMonthStats.totalShifts} Shifts</div>
+              </div>
             </div>
 
             {/* Elegant Calendar Grid */}
