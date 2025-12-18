@@ -302,25 +302,23 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
             </div>
 
             {/* Smart Presets */}
-            <div className="flex gap-2 mb-2 overflow-x-auto no-scrollbar pb-1">
-              {[
-                { label: '早班 (09-18)', start: '09:00', end: '18:00' },
-                { label: '晚班 (18-22)', start: '18:00', end: '22:00' },
-                { label: '全天 (10-22)', start: '10:00', end: '22:00' },
-              ].map(preset => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => {
-                    setStartTime(preset.start);
-                    setEndTime(preset.end);
-                  }}
-                  className="flex-none px-3 py-1.5 rounded-lg bg-[#F9F7F2] text-[#8E8679] text-xs font-bold border border-[#8E8679]/20 hover:bg-[#DCC7A1] hover:text-[#333333] hover:border-[#DCC7A1] transition-colors"
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
+            {(activeJob.presets && activeJob.presets.length > 0) && (
+              <div className="flex gap-2 mb-2 overflow-x-auto no-scrollbar pb-1">
+                {activeJob.presets.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setStartTime(preset.start);
+                      setEndTime(preset.end);
+                    }}
+                    className="flex-none px-3 py-1.5 rounded-lg bg-[#F9F7F2] text-[#8E8679] text-xs font-bold border border-[#8E8679]/20 hover:bg-[#DCC7A1] hover:text-[#333333] hover:border-[#DCC7A1] transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="p-4 rounded-2xl bg-[#F9F7F2] border border-[#8E8679]/20 space-y-4">
               <div className="grid grid-cols-2 gap-4">

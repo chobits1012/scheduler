@@ -1,6 +1,12 @@
 
 export type PayType = 'hourly' | 'perShift';
 
+export interface JobPreset {
+  label: string;
+  start: string;
+  end: string;
+}
+
 export interface Job {
   id: string;
   name: string;
@@ -8,6 +14,7 @@ export interface Job {
   managerName?: string;
   hourlyRate?: number; // Functions as "Rate" (either per hour or per shift based on payType)
   payType?: PayType;   // New: Determines how the rate is applied
+  presets?: JobPreset[];
 }
 
 export interface Shift {

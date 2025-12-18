@@ -43,8 +43,29 @@ import {
 
 // Mock Initial Data
 const INITIAL_JOBS: Job[] = [
-  { id: JOB_A_ID, name: '小狐狸', color: 'indigo', managerName: '陳店長', hourlyRate: 183, payType: 'hourly' },
-  { id: JOB_B_ID, name: '開溜', color: 'emerald', managerName: '林組長', hourlyRate: 1200, payType: 'perShift' }
+  {
+    id: JOB_A_ID,
+    name: '小狐狸',
+    color: 'indigo',
+    managerName: '陳店長',
+    hourlyRate: 183,
+    payType: 'hourly',
+    presets: [
+      { label: '早班', start: '09:00', end: '18:00' },
+      { label: '晚班', start: '18:00', end: '22:00' }
+    ]
+  },
+  {
+    id: JOB_B_ID,
+    name: '開溜',
+    color: 'emerald',
+    managerName: '林組長',
+    hourlyRate: 1200,
+    payType: 'perShift',
+    presets: [
+      { label: '全天', start: '10:00', end: '22:00' }
+    ]
+  }
 ];
 
 const App: React.FC = () => {
@@ -198,7 +219,10 @@ const App: React.FC = () => {
       name: `新工作 ${jobs.length + 1}`,
       color: AVAILABLE_COLORS[jobs.length % AVAILABLE_COLORS.length].value,
       payType: 'hourly',
-      hourlyRate: 183
+      hourlyRate: 183,
+      presets: [
+        { label: '早班', start: '09:00', end: '17:00' }
+      ]
     };
     setJobs(prev => [...prev, newJob]);
   };
@@ -841,6 +865,79 @@ const App: React.FC = () => {
                                 </div>
                               </div>
                             </div>
+
+                            {/* Presets Editor */}
+                            <div>
+                              <label className="block text-[8px] font-black text-[#8E8679] uppercase tracking-[0.4em] mb-2">Smart Presets</label>
+                              <div className="space-y-2 mb-2">
+                                {(job.presets || []).map((preset, pIdx) => (
+                                  <div key={pIdx} className="flex gap-2 items-center">
+                                    <input
+                                      type="text"
+                                      value={preset.label}
+                                      onChange={(e) => {
+                                        const newJobs = [...jobs];
+                                        const newPresets = [...(newJobs[idx].presets || [])];
+                                        newPresets[pIdx] = { ...newPresets[pIdx], label: e.target.value };
+                                        newJobs[idx].presets = newPresets;
+                                        setJobs(newJobs);
+                                      }}
+                                      className="w-1/3 bg-[#F9F7F2] border-b border-[#8E8679]/30 p-2 text-xs font-bold text-[#333333] outline-none"
+                                      placeholder="Label"
+                                    />
+                                    <input
+                                      type="time"
+                                      value={preset.start}
+                                      onChange={(e) => {
+                                        const newJobs = [...jobs];
+                                        const newPresets = [...(newJobs[idx].presets || [])];
+                                        newPresets[pIdx] = { ...newPresets[pIdx], start: e.target.value };
+                                        newJobs[idx].presets = newPresets;
+                                        setJobs(newJobs);
+                                      }}
+                                      className="w-1/4 bg-[#F9F7F2] border-b border-[#8E8679]/30 p-2 text-xs font-mono text-[#333333] outline-none text-center"
+                                    />
+                                    <span className="text-[#8E8679]">-</span>
+                                    <input
+                                      type="time"
+                                      value={preset.end}
+                                      onChange={(e) => {
+                                        const newJobs = [...jobs];
+                                        const newPresets = [...(newJobs[idx].presets || [])];
+                                        newPresets[pIdx] = { ...newPresets[pIdx], end: e.target.value };
+                                        newJobs[idx].presets = newPresets;
+                                        setJobs(newJobs);
+                                      }}
+                                      className="w-1/4 bg-[#F9F7F2] border-b border-[#8E8679]/30 p-2 text-xs font-mono text-[#333333] outline-none text-center"
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        const newJobs = [...jobs];
+                                        const newPresets = [...(newJobs[idx].presets || [])];
+                                        newPresets.splice(pIdx, 1);
+                                        newJobs[idx].presets = newPresets;
+                                        setJobs(newJobs);
+                                      }}
+                                      className="text-[#8E8679] hover:text-red-400 p-1"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newJobs = [...jobs];
+                                  const newPresets = [...(newJobs[idx].presets || [])];
+                                  newPresets.push({ label: 'New', start: '09:00', end: '17:00' });
+                                  newJobs[idx].presets = newPresets;
+                                  setJobs(newJobs);
+                                }}
+                                className="text-[9px] font-black text-[#8E8679] hover:text-[#333333] uppercase tracking-wider flex items-center gap-1 py-2"
+                              >
+                                <Plus size={12} /> Add Preset
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -861,7 +958,7 @@ const App: React.FC = () => {
                     onClick={() => setIsSettingsOpen(false)}
                     className="w-full bg-[#333333] text-white py-4 font-black uppercase tracking-[0.4em] text-[9px] hover:bg-[#5D432C] transition-all"
                   >
-                    Update Workspace
+                    Done
                   </button>
                 </div>
               </div>
@@ -871,64 +968,66 @@ const App: React.FC = () => {
       </div >
 
       {/* Sync Modal (Mobile) */}
-      {isSyncModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-[#333333]/40 backdrop-blur-sm" onClick={() => setIsSyncModalOpen(false)}></div>
-          <div className="bg-white relative w-full max-w-sm p-6 animate-slide-up shadow-lg rounded-xl overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center mb-6 border-b border-[#F9F7F2] pb-4">
-              <h3 className="font-black text-lg text-[#333333] flex items-center gap-2 uppercase tracking-[0.2em]">
-                <Cloud size={20} className="text-[#DCC7A1]" /> Sync Center
-              </h3>
-              <button onClick={() => setIsSyncModalOpen(false)} className="p-2 bg-[#F9F7F2] rounded-full hover:bg-[#8E8679]/10 transition"><X size={16} /></button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">
-                  {user?.displayName?.[0] || 'U'}
-                </div>
-                <div>
-                  <div className="text-[9px] font-black uppercase text-emerald-800 tracking-wider">Logged in as</div>
-                  <div className="text-sm font-bold text-[#333333]">{user?.displayName || 'User'}</div>
-                </div>
+      {
+        isSyncModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-[#333333]/40 backdrop-blur-sm" onClick={() => setIsSyncModalOpen(false)}></div>
+            <div className="bg-white relative w-full max-w-sm p-6 animate-slide-up shadow-lg rounded-xl overflow-hidden flex flex-col">
+              <div className="flex justify-between items-center mb-6 border-b border-[#F9F7F2] pb-4">
+                <h3 className="font-black text-lg text-[#333333] flex items-center gap-2 uppercase tracking-[0.2em]">
+                  <Cloud size={20} className="text-[#DCC7A1]" /> Sync Center
+                </h3>
+                <button onClick={() => setIsSyncModalOpen(false)} className="p-2 bg-[#F9F7F2] rounded-full hover:bg-[#8E8679]/10 transition"><X size={16} /></button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">
+                    {user?.displayName?.[0] || 'U'}
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-black uppercase text-emerald-800 tracking-wider">Logged in as</div>
+                    <div className="text-sm font-bold text-[#333333]">{user?.displayName || 'User'}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setIsSyncModalOpen(false);
+                      handleManualUpload();
+                    }}
+                    className="py-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-emerald-100 transition"
+                  >
+                    <Cloud size={20} />
+                    <span className="text-[10px] font-black uppercase tracking-wider">Upload</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsSyncModalOpen(false);
+                      handleManualDownload();
+                    }}
+                    className="py-4 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-blue-100 transition"
+                  >
+                    <Download size={20} />
+                    <span className="text-[10px] font-black uppercase tracking-wider">Download</span>
+                  </button>
+                </div>
+
                 <button
                   onClick={() => {
+                    logout();
                     setIsSyncModalOpen(false);
-                    handleManualUpload();
                   }}
-                  className="py-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-emerald-100 transition"
+                  className="w-full py-3 mt-2 flex items-center justify-center gap-2 text-[#8E8679] hover:text-red-500 hover:bg-red-50 rounded-lg transition font-bold"
                 >
-                  <Cloud size={20} />
-                  <span className="text-[10px] font-black uppercase tracking-wider">Upload</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setIsSyncModalOpen(false);
-                    handleManualDownload();
-                  }}
-                  className="py-4 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-blue-100 transition"
-                >
-                  <Download size={20} />
-                  <span className="text-[10px] font-black uppercase tracking-wider">Download</span>
+                  <LogOut size={16} /> <span className="text-xs uppercase tracking-wider">Logout</span>
                 </button>
               </div>
-
-              <button
-                onClick={() => {
-                  logout();
-                  setIsSyncModalOpen(false);
-                }}
-                className="w-full py-3 mt-2 flex items-center justify-center gap-2 text-[#8E8679] hover:text-red-500 hover:bg-red-50 rounded-lg transition font-bold"
-              >
-                <LogOut size={16} /> <span className="text-xs uppercase tracking-wider">Logout</span>
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
 
       <ConfigModal
