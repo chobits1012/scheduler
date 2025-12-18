@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { CalendarDay, Job, Shift, JOB_A_ID, JOB_B_ID, ALL_JOBS_ID, PayType, ClipboardShift } from './types';
 import { generateAvailabilityMessage } from './services/geminiService';
 import { ShiftModal } from './components/ShiftModal';
@@ -50,6 +51,7 @@ const App: React.FC = () => {
   // --- State ---
   const [currentDate, setCurrentDate] = useState(new Date());
   const [activeJobId, setActiveJobId] = useState<string>(ALL_JOBS_ID);
+  const [direction, setDirection] = useState(0);
 
   // Auth & Cloud Sync
   const { user, login, logout, loading: authLoading, error: authError } = useAuth();
@@ -126,7 +128,43 @@ const App: React.FC = () => {
 
   // --- Handlers ---
   const changeMonth = (delta: number) => {
+    setDirection(delta);
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1));
+  };
+
+  const swipeConfidenceThreshold = 10000;
+  const swipePower = (offset: number, velocity: number) => {
+    return Math.abs(offset) * velocity;
+  };
+
+  const onDragEnd = (e: any, { offset, velocity }: PanInfo) => {
+    const swipe = swipePower(offset.x, velocity.x);
+
+    if (swipe < -swipeConfidenceThreshold) {
+      changeMonth(1);
+    } else if (swipe > swipeConfidenceThreshold) {
+      changeMonth(-1);
+    }
+  };
+
+  const variants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? '100%' : '-100%',
+      opacity: 0,
+      position: 'absolute' as const // Fix layout shift
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1,
+      position: 'relative' as const
+    },
+    exit: (direction: number) => ({
+      zIndex: 0,
+      x: direction < 0 ? '100%' : '-100%',
+      opacity: 0,
+      position: 'absolute' as const // Fix layout shift
+    })
   };
 
   const handleDayClick = (day: CalendarDay) => {
@@ -463,7 +501,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Elegant Calendar Grid */}
-            <div className="bg-white p-6 shadow-sm border border-[#8E8679]/20 animate-stagger-2 rounded-xl">
+            <div className="bg-white p-6 shadow-sm border border-[#8E8679]/20 animate-stagger-2 rounded-xl overflow-hidden relative min-h-[400px]">
               {/* Weekday Headers */}
               <div className="grid grid-cols-7 mb-6 border-b border-[#F9F7F2] pb-4">
                 {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d, i) => (
@@ -473,52 +511,70 @@ const App: React.FC = () => {
                 ))}
               </div>
 
-              {/* Days */}
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((day, idx) => {
-                  const dayShifts = getDayShifts(day.dateStr);
-                  const relevantShifts = isOverviewMode
-                    ? dayShifts
-                    : dayShifts.filter(s => s.jobId === activeJobId);
+              {/* Days with Swipe & Animation */}
+              <AnimatePresence initial={false} custom={direction}>
+                <motion.div
+                  key={currentDate.toISOString()}
+                  custom={direction}
+                  variants={variants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    x: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.2 }
+                  }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={1}
+                  onDragEnd={onDragEnd}
+                  className="grid grid-cols-7 gap-1 w-full"
+                >
+                  {calendarDays.map((day, idx) => {
+                    const dayShifts = getDayShifts(day.dateStr);
+                    const relevantShifts = isOverviewMode
+                      ? dayShifts
+                      : dayShifts.filter(s => s.jobId === activeJobId);
 
-                  relevantShifts.sort((a, b) => {
-                    if (a.jobId !== b.jobId) return a.jobId.localeCompare(b.jobId);
-                    return a.startTime.localeCompare(b.startTime);
-                  });
+                    relevantShifts.sort((a, b) => {
+                      if (a.jobId !== b.jobId) return a.jobId.localeCompare(b.jobId);
+                      return a.startTime.localeCompare(b.startTime);
+                    });
 
-                  return (
-                    <div
-                      key={day.dateStr + idx}
-                      onClick={() => handleDayClick(day)}
-                      className={`
-                        aspect-square md:aspect-[4/5] relative cursor-pointer transition-all duration-300 group
-                        flex flex-col items-center justify-between p-2 border border-transparent rounded-md
-                        ${!day.isCurrentMonth ? 'opacity-10 grayscale' : 'hover:bg-[#F9F7F2] hover:border-[#8E8679]/30 hover:z-10'}
-                        ${day.isToday ? 'bg-[#333333] text-white' : 'bg-[#8E8679]/5'}
-                        ${selectedDateStr === day.dateStr ? 'ring-1 ring-[#333333] bg-[#DCC7A1]/10' : ''}
-                      `}
-                    >
-                      <span className={`text-[9px] md:text-xs font-black tracking-tighter ${day.isToday ? 'text-white' : 'text-[#8E8679] group-hover:text-[#333333]'}`}>
-                        {day.date.getDate()}
-                      </span>
+                    return (
+                      <div
+                        key={day.dateStr + idx}
+                        onClick={() => handleDayClick(day)}
+                        className={`
+                          aspect-square md:aspect-[4/5] relative cursor-pointer transition-all duration-300 group
+                          flex flex-col items-center justify-between p-2 border border-transparent rounded-md
+                          ${!day.isCurrentMonth ? 'opacity-10 grayscale' : 'hover:bg-[#F9F7F2] hover:border-[#8E8679]/30 hover:z-10'}
+                          ${day.isToday ? 'bg-[#333333] text-white' : 'bg-[#8E8679]/5'}
+                          ${selectedDateStr === day.dateStr ? 'ring-1 ring-[#333333] bg-[#DCC7A1]/10' : ''}
+                        `}
+                      >
+                        <span className={`text-[9px] md:text-xs font-black tracking-tighter ${day.isToday ? 'text-white' : 'text-[#8E8679] group-hover:text-[#333333]'}`}>
+                          {day.date.getDate()}
+                        </span>
 
-                      {/* Visual Indicators */}
-                      <div className="flex flex-wrap gap-1 w-full justify-center mt-auto">
-                        {relevantShifts.map(shift => {
-                          const job = jobs.find(j => j.id === shift.jobId);
-                          const color = getColorClass(job?.color || 'stone', 'bg');
-                          return (
-                            <div
-                              key={shift.id}
-                              className={`w-1.5 h-1.5 rounded-full ${color} shadow-sm border border-white/20`}
-                            />
-                          );
-                        })}
+                        {/* Visual Indicators */}
+                        <div className="flex flex-wrap gap-1 w-full justify-center mt-auto">
+                          {relevantShifts.map(shift => {
+                            const job = jobs.find(j => j.id === shift.jobId);
+                            const color = getColorClass(job?.color || 'stone', 'bg');
+                            return (
+                              <div
+                                key={shift.id}
+                                className={`w-1.5 h-1.5 rounded-full ${color} shadow-sm border border-white/20`}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </motion.div>
+              </AnimatePresence>
             </div>
 
             {/* Selected Date Details (Mobile Helper) */}
