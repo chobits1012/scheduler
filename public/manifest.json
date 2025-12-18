@@ -1,0 +1,16 @@
+{
+    "name": "ShiftSync - 雙職排班助手",
+    "short_name": "ShiftSync",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#F9F7F2",
+    "theme_color": "#F9F7F2",
+    "description": "A minimalist dual-job shift scheduler.",
+    "icons": [
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

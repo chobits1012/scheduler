@@ -1,0 +1,5 @@
+{
+  "name": "ShiftSync - Dual Job Scheduler",
+  "description": "A smart scheduling tool for managing availability across two jobs. Visualizes conflicts instantly and uses Gemini AI to draft availability messages for your managers.",
+  "requestFramePermissions": []
+}

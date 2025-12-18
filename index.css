@@ -1,0 +1,173 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Noto+Sans+TC:wght@100..900&display=swap');
+
+:root {
+    /* Warm Wood Palette */
+    --bg-home: #F9F7F2;
+    --light-oak: #DCC7A1;
+    --medium-wood: #B5936D;
+    --dark-walnut: #5D432C;
+    --text-main: #333333;
+    --text-muted: #8E8679;
+
+    --japandi-bg: #F9F7F2;
+    --japandi-light-wood: #DCC7A1;
+    --japandi-stone: #B7B1A4;
+    --japandi-dark-wood: #5D432C;
+    --japandi-text: #333333;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        @apply bg-[#F9F7F2] text-[#333333] antialiased;
+        font-family: 'Outfit', 'Noto Sans TC', sans-serif;
+    }
+}
+
+/* Texture & Background */
+.japandi-bg-container {
+    position: fixed;
+    inset: 0;
+    background-color: var(--bg-home);
+    z-index: -2;
+}
+
+.paper-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    opacity: 0.25;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Premium Card (Rounded) */
+.premium-card {
+    @apply bg-white border border-[#DCC7A1]/30 transition-all duration-500 shadow-sm;
+    border-radius: 8px;
+}
+
+.premium-card:hover {
+    @apply border-[#DCC7A1] shadow-md;
+}
+
+/* Sidebar Specifics */
+.sidebar-header {
+    @apply bg-[#DCC7A1]/10 border-b border-[#DCC7A1]/20;
+}
+
+.tag-stone {
+    @apply bg-[#B7B1A4]/10 text-[#B7B1A4] border border-[#B7B1A4]/20;
+}
+
+/* Staggered Animations */
+.animate-stagger-1 {
+    animation: japandiSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-stagger-2 {
+    animation: japandiSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+    opacity: 0;
+}
+
+.animate-stagger-3 {
+    animation: japandiSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+    opacity: 0;
+}
+
+@keyframes japandiSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(181, 147, 109, 0.3);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(93, 67, 44, 0.5);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Nailed Wooden Plaque (The One User Wanted) */
+.wood-plaque {
+    position: relative;
+    z-index: 50;
+    background-color: #DCC7A1 !important;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: default;
+    transition: all 0.5s ease;
+    /* Light Oak Texture */
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        repeating-linear-gradient(90deg,
+            rgba(0, 0, 0, 0.1) 0px,
+            rgba(0, 0, 0, 0.1) 1px,
+            transparent 1px,
+            transparent 12px);
+    /* Heavy 3D Shadows for depth against off-white bg */
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.1),
+        inset 0 -3px 8px rgba(0, 0, 0, 0.4),
+        0 15px 30px -10px rgba(0, 0, 0, 0.5),
+        0 5px 15px -3px rgba(0, 0, 0, 0.2);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+.wood-plaque::before,
+.wood-plaque::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: radial-gradient(circle at 30% 30%, #999, #333);
+    border-radius: 50%;
+    box-shadow:
+        1px 1px 2px rgba(0, 0, 0, 0.5),
+        inset -1px -1px 1px rgba(255, 255, 255, 0.2);
+    z-index: 5;
+    opacity: 0.9;
+}
+
+.wood-plaque::before {
+    left: 10px;
+}
+
+.wood-plaque::after {
+    right: 10px;
+}
+
+.wood-plaque h2 {
+    color: #5D432C !important;
+}
