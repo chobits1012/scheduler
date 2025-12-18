@@ -442,7 +442,7 @@ const App: React.FC = () => {
         </aside>
 
         {/* --- Mobile Header --- */}
-        <header className="md:hidden sticky top-0 z-30 px-6 pt-6 pb-4 animate-fade-in">
+        <header className="md:hidden sticky top-0 z-30 px-6 pb-4 animate-fade-in bg-[#F9F7F2] pt-[calc(1.5rem+env(safe-area-inset-top))]">
           <div className="bg-white/90 backdrop-blur-md p-4 flex justify-between items-center shadow-sm border border-[#8E8679]/20 rounded-xl">
             <div>
               <h1 className="text-xl font-black text-[#333333] tracking-tight uppercase">
