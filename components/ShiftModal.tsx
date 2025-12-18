@@ -152,7 +152,7 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
       <div
-        className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 bg-[#333333]/40 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       />
 
@@ -162,16 +162,16 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
           <div className="w-12 h-1.5 bg-stone-200 rounded-full"></div>
         </div>
 
-        <div className="px-6 py-4 flex justify-between items-center shrink-0 border-b border-stone-50">
+        <div className="px-6 py-4 flex justify-between items-center shrink-0 border-b border-[#F9F7F2]">
           <div>
-            <h2 className="text-xl font-bold text-stone-800 flex items-center gap-2 tracking-tight">
+            <h2 className="text-xl font-black text-[#333333] flex items-center gap-2 tracking-tight uppercase">
               {parseLocalISO(dateStr).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' })}
-              <span className="text-sm font-normal text-stone-400">
+              <span className="text-xs font-black text-[#8E8679] opacity-60 tracking-[0.2em]">
                 {parseLocalISO(dateStr).toLocaleDateString('zh-TW', { weekday: 'long' })}
               </span>
             </h2>
           </div>
-          <button onClick={onClose} className="bg-stone-100 hover:bg-stone-200 p-2 rounded-full transition text-stone-500">
+          <button onClick={onClose} className="bg-[#F9F7F2] hover:bg-[#8E8679]/20 p-2 rounded-full transition text-[#8E8679]">
             <X size={20} />
           </button>
         </div>
@@ -301,39 +301,60 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
               )}
             </div>
 
-            <div className="p-4 rounded-2xl bg-stone-50/80 border border-stone-100 space-y-4">
+            {/* Smart Presets */}
+            <div className="flex gap-2 mb-2 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { label: '早班 (09-18)', start: '09:00', end: '18:00' },
+                { label: '晚班 (18-22)', start: '18:00', end: '22:00' },
+                { label: '全天 (10-22)', start: '10:00', end: '22:00' },
+              ].map(preset => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    setStartTime(preset.start);
+                    setEndTime(preset.end);
+                  }}
+                  className="flex-none px-3 py-1.5 rounded-lg bg-[#F9F7F2] text-[#8E8679] text-xs font-bold border border-[#8E8679]/20 hover:bg-[#DCC7A1] hover:text-[#333333] hover:border-[#DCC7A1] transition-colors"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#F9F7F2] border border-[#8E8679]/20 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="group">
-                  <label className="block text-[10px] font-bold text-stone-400 mb-1">開始</label>
+                  <label className="block text-[10px] font-black text-[#8E8679] uppercase tracking-wider mb-1">Start Time</label>
                   <input
                     type="time"
                     required
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full bg-white rounded-xl py-3 px-3 text-base font-bold text-stone-700 focus:ring-2 focus:ring-stone-200 outline-none transition shadow-sm text-center"
+                    className="w-full bg-white rounded-xl py-3 px-3 text-base font-black text-[#333333] focus:ring-1 focus:ring-[#DCC7A1] border border-transparent focus:border-[#DCC7A1] outline-none transition shadow-sm text-center tracking-widest"
                   />
                 </div>
                 <div className="group">
-                  <label className="block text-[10px] font-bold text-stone-400 mb-1">結束</label>
+                  <label className="block text-[10px] font-black text-[#8E8679] uppercase tracking-wider mb-1">End Time</label>
                   <input
                     type="time"
                     required
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full bg-white rounded-xl py-3 px-3 text-base font-bold text-stone-700 focus:ring-2 focus:ring-stone-200 outline-none transition shadow-sm text-center"
+                    className="w-full bg-white rounded-xl py-3 px-3 text-base font-black text-[#333333] focus:ring-1 focus:ring-[#DCC7A1] border border-transparent focus:border-[#DCC7A1] outline-none transition shadow-sm text-center tracking-widest"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="flex items-center gap-2 p-2 bg-stone-50 rounded-xl cursor-pointer hover:bg-stone-100 transition">
+                <label className="flex items-center gap-2 p-2 bg-white/50 rounded-xl cursor-pointer hover:bg-white transition border border-transparent hover:border-[#8E8679]/10">
                   <input
                     type="checkbox"
                     checked={isDoublePay}
                     onChange={(e) => setIsDoublePay(e.target.checked)}
-                    className="w-4 h-4 rounded text-stone-600 focus:ring-stone-500"
+                    className="w-4 h-4 rounded text-[#333333] focus:ring-[#DCC7A1]"
                   />
-                  <span className="text-xs font-bold text-stone-500">Double Pay (雙倍薪)</span>
+                  <span className="text-xs font-bold text-[#8E8679]">Double Pay (雙倍薪)</span>
                 </label>
               </div>
 
@@ -342,7 +363,7 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="備註 (選填)"
-                  className="w-full bg-white rounded-xl p-3 text-sm text-stone-600 focus:ring-2 focus:ring-stone-200 outline-none shadow-sm placeholder-stone-300"
+                  className="w-full bg-white rounded-xl p-3 text-sm font-medium text-[#333333] focus:ring-1 focus:ring-[#DCC7A1] border border-transparent focus:border-[#DCC7A1] outline-none shadow-sm placeholder-[#8E8679]/50"
                 />
               </div>
 
