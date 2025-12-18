@@ -77,6 +77,7 @@ const App: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [confirmModalState, setConfirmModalState] = useState<{
     isOpen: boolean;
@@ -391,7 +392,10 @@ const App: React.FC = () => {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={user ? logout : login}
+                onClick={() => {
+                  if (!user) login();
+                  else setIsSyncModalOpen(true);
+                }}
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
                 onTouchMove={handleTouchEnd}
@@ -792,6 +796,68 @@ const App: React.FC = () => {
           )
         }
       </div >
+
+      {/* Sync Modal (Mobile) */}
+      {isSyncModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#333333]/40 backdrop-blur-sm" onClick={() => setIsSyncModalOpen(false)}></div>
+          <div className="bg-white relative w-full max-w-sm p-6 animate-slide-up shadow-lg rounded-xl overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-6 border-b border-[#F9F7F2] pb-4">
+              <h3 className="font-black text-lg text-[#333333] flex items-center gap-2 uppercase tracking-[0.2em]">
+                <Cloud size={20} className="text-[#DCC7A1]" /> Sync Center
+              </h3>
+              <button onClick={() => setIsSyncModalOpen(false)} className="p-2 bg-[#F9F7F2] rounded-full hover:bg-[#8E8679]/10 transition"><X size={16} /></button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">
+                  {user?.displayName?.[0] || 'U'}
+                </div>
+                <div>
+                  <div className="text-[9px] font-black uppercase text-emerald-800 tracking-wider">Logged in as</div>
+                  <div className="text-sm font-bold text-[#333333]">{user?.displayName || 'User'}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setIsSyncModalOpen(false);
+                    handleManualUpload();
+                  }}
+                  className="py-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-emerald-100 transition"
+                >
+                  <Cloud size={20} />
+                  <span className="text-[10px] font-black uppercase tracking-wider">Upload</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSyncModalOpen(false);
+                    handleManualDownload();
+                  }}
+                  className="py-4 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-blue-100 transition"
+                >
+                  <Download size={20} />
+                  <span className="text-[10px] font-black uppercase tracking-wider">Download</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  logout();
+                  setIsSyncModalOpen(false);
+                }}
+                className="w-full py-3 mt-2 flex items-center justify-center gap-2 text-[#8E8679] hover:text-red-500 hover:bg-red-50 rounded-lg transition font-bold"
+              >
+                <LogOut size={16} /> <span className="text-xs uppercase tracking-wider">Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       <ConfigModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
