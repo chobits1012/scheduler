@@ -414,6 +414,11 @@ const App: React.FC = () => {
                   <Sparkles size={18} />
                 </button>
               )}
+              {isOverviewMode && (
+                <button onClick={handleExportIcal} className="w-10 h-10 border border-[#8E8679]/20 text-[#8E8679] flex items-center justify-center rounded-lg">
+                  <Download size={18} />
+                </button>
+              )}
               <button onClick={() => setIsQuickAddOpen(true)} className="w-10 h-10 bg-amber-100 text-amber-900 flex items-center justify-center rounded-lg border border-amber-200">
                 <Zap size={18} />
               </button>
