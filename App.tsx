@@ -38,7 +38,10 @@ import {
   CloudOff,
   LogOut,
   User as UserIcon,
-  Zap
+
+  Zap,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 
 // Mock Initial Data
@@ -96,9 +99,8 @@ const App: React.FC = () => {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [selectedDateStr, setSelectedDateStr] = useState<string>('');
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiMessage, setAiMessage] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -137,7 +139,17 @@ const App: React.FC = () => {
   // Clipboard State (Now an Array)
 
   // Clipboard State (Now an Array)
+  // Clipboard State (Now an Array)
   const [clipboardShifts, setClipboardShifts] = useState<ClipboardShift[]>([]);
+
+  // --- Quick Schedule Mode ---
+  const [isQuickMode, setIsQuickMode] = useState(false);
+  const [activePresetIndex, setActivePresetIndex] = useState(0);
+
+  // Turn off Quick Mode when switching to Overview
+  useEffect(() => {
+    if (activeJobId === ALL_JOBS_ID) setIsQuickMode(false);
+  }, [activeJobId]);
 
   // --- Computed ---
   const isOverviewMode = activeJobId === ALL_JOBS_ID;
@@ -189,6 +201,42 @@ const App: React.FC = () => {
   };
 
   const handleDayClick = (day: CalendarDay) => {
+    // Quick Mode Logic
+    if (isQuickMode && !isOverviewMode && activeJob) {
+      const presets = activeJob.presets || [];
+      const preset = presets[activePresetIndex];
+
+      if (!preset) return;
+
+      // Check for existing identical shift to toggle
+      const existingShift = shifts.find(s =>
+        s.jobId === activeJobId &&
+        s.dateStr === day.dateStr &&
+        s.startTime === preset.start &&
+        s.endTime === preset.end
+      );
+
+      if (existingShift) {
+        // Toggle OFF (Delete)
+        handleDeleteShift(existingShift.id);
+        if (navigator.vibrate) navigator.vibrate(50);
+      } else {
+        // Toggle ON (Add)
+        const newShift: Shift = {
+          id: crypto.randomUUID(),
+          jobId: activeJobId,
+          dateStr: day.dateStr,
+          startTime: preset.start,
+          endTime: preset.end,
+          note: preset.label
+        };
+        handleAddShift(newShift);
+        if (navigator.vibrate) navigator.vibrate(20);
+      }
+      return;
+    }
+
+    // Normal Mode
     setSelectedDateStr(day.dateStr);
     setIsModalOpen(true);
   };
@@ -235,30 +283,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerateAiMessage = async () => {
-    if (isOverviewMode || !activeJob) return;
-    setIsAiModalOpen(true);
-    setIsGenerating(true);
-    setAiMessage('');
-
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const monthShifts = shifts.filter(s => {
-      const d = new Date(s.dateStr);
-      return s.jobId === activeJobId && d.getFullYear() === year && d.getMonth() === month;
-    });
-
-    const monthName = currentDate.toLocaleString('zh-TW', { month: 'long' });
-    const msg = await generateAvailabilityMessage(activeJob, monthShifts, monthName);
-    setAiMessage(msg);
-    setIsGenerating(false);
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(aiMessage);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
-  };
 
   // --- Render Helpers ---
   const getDayShifts = (dateStr: string) => shifts.filter(s => s.dateStr === dateStr);
@@ -430,6 +454,16 @@ const App: React.FC = () => {
             >
               <Settings size={18} />
             </button>
+            {!isOverviewMode && (
+              <button
+                onClick={() => setIsQuickMode(!isQuickMode)}
+                className={`w-10 h-10 border transition-all flex items-center justify-center transition-all ${isQuickMode ? 'bg-[#333333] text-white border-[#333333]' : 'border-[#8E8679]/30 text-[#8E8679] hover:bg-white bg-white/20'}`}
+                title={isQuickMode ? "Close Quick Schedule" : "Open Quick Schedule"}
+              >
+                {isQuickMode ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+              </button>
+            )}
+
             {isOverviewMode && (
               <button
                 onClick={handleExportIcal}
@@ -471,11 +505,7 @@ const App: React.FC = () => {
                 {user ? <Cloud size={18} /> : <CloudOff size={18} />}
               </button>
 
-              {!isOverviewMode && (
-                <button onClick={handleGenerateAiMessage} className="w-10 h-10 bg-[#333333] text-white flex items-center justify-center rounded-lg">
-                  <Sparkles size={18} />
-                </button>
-              )}
+
               {isOverviewMode && (
                 <button onClick={handleExportIcal} className="w-10 h-10 border border-[#8E8679]/20 text-[#8E8679] flex items-center justify-center rounded-lg">
                   <Download size={18} />
@@ -484,6 +514,17 @@ const App: React.FC = () => {
               <button onClick={() => setIsQuickAddOpen(true)} className="w-10 h-10 bg-amber-100 text-amber-900 flex items-center justify-center rounded-lg border border-amber-200">
                 <Zap size={18} />
               </button>
+
+              {!isOverviewMode && (
+                <button
+                  onClick={() => setIsQuickMode(!isQuickMode)}
+                  className={`w-10 h-10 flex items-center justify-center rounded-lg border transition-all ${isQuickMode ? 'bg-[#333333] text-white border-[#333333]' : 'border-[#8E8679]/20 text-[#8E8679] bg-white'}`}
+                  title={isQuickMode ? "Close Quick Schedule" : "Open Quick Schedule"}
+                >
+                  {isQuickMode ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                </button>
+              )}
+
               <button onClick={() => setIsSettingsOpen(true)} className="w-10 h-10 border border-[#8E8679]/20 text-[#8E8679] flex items-center justify-center rounded-lg">
                 <Settings size={18} />
               </button>
@@ -601,6 +642,8 @@ const App: React.FC = () => {
               </AnimatePresence>
             </div>
 
+
+
             {/* Selected Date Details (Mobile Helper) */}
             {selectedDateStr && (
               <div className="mt-8 md:hidden animate-fade-in pb-12">
@@ -663,6 +706,56 @@ const App: React.FC = () => {
         </nav>
 
         {/* --- Modals --- */}
+
+        {/* Quick Paint Toolbar (Bottom Sheet) - Moved to Root */}
+        <AnimatePresence>
+          {isQuickMode && !isOverviewMode && activeJob && (
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-[#8E8679]/20 shadow-[0_-10px_40px_-5px_rgba(0,0,0,0.1)] pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            >
+              <div className="p-4 md:p-6 max-w-lg mx-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8E8679]">Quick Paint</div>
+                    <div className="text-sm font-black text-[#333333]">Tap dates to paint</div>
+                  </div>
+                  <button onClick={() => setIsQuickMode(false)} className="bg-[#F9F7F2] p-2 rounded-full hover:bg-stone-200 transition"><X size={16} /></button>
+                </div>
+
+                <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                  {(activeJob.presets || []).map((preset, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActivePresetIndex(idx)}
+                      className={`
+                       flex-shrink-0 px-4 py-3 rounded-xl border flex flex-col items-start min-w-[100px] transition-all
+                       ${activePresetIndex === idx
+                          ? 'bg-[#333333] text-white border-[#333333] ring-2 ring-[#DCC7A1] ring-offset-2'
+                          : 'bg-[#F9F7F2] text-[#8E8679] border-transparent hover:bg-[#EAE5D9]'
+                        }
+                     `}
+                    >
+                      <span className="text-xs font-black tracking-wider block mb-1">{preset.label}</span>
+                      <span className={`text-[10px] font-mono opacity-80 ${activePresetIndex === idx ? 'text-[#DCC7A1]' : ''}`}>
+                        {preset.start}-{preset.end}
+                      </span>
+                    </button>
+                  ))}
+                  {(!activeJob.presets || activeJob.presets.length === 0) && (
+                    <div className="w-full text-center py-4 text-xs text-[#8E8679] italic border border-dashed border-[#8E8679]/30 rounded-lg">
+                      No presets found. Add them in Settings.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <ShiftModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
@@ -686,46 +779,6 @@ const App: React.FC = () => {
           currentMonth={currentDate.getMonth()}
           jobs={jobs}
         />
-
-        {/* AI Modal */}
-        {
-          isAiModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div className="absolute inset-0 bg-[#333333]/40 backdrop-blur-sm" onClick={() => setIsAiModalOpen(false)}></div>
-              <div className="bg-white relative shadow-sm w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-slide-up rounded-xl">
-                <div className={`p-8 pb-4 border-b border-[#F9F7F2]`}>
-                  <h3 className="font-black text-lg text-[#333333] flex items-center gap-3 uppercase tracking-[0.2em]">
-                    <Sparkles className="text-[#DCC7A1]" size={20} /> AI Agent / Message
-                  </h3>
-                </div>
-                <div className="p-8 pt-6 overflow-y-auto">
-                  {isGenerating ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-[#8E8679]">
-                      <Loader2 className="animate-spin mb-4 text-[#333333]" size={36} />
-                      <p className="text-[8px] font-black uppercase tracking-[0.4em]">Drafting Content...</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="bg-[#F9F7F2] p-6 border border-[#8E8679]/20 text-[#333333] mb-8 leading-relaxed whitespace-pre-wrap text-sm italic font-medium">
-                        {aiMessage}
-                      </div>
-                      <button
-                        onClick={copyToClipboard}
-                        className={`w-full py-4 font-black transition flex items-center justify-center gap-2 uppercase tracking-[0.3em] text-[10px]
-                      ${copySuccess
-                            ? 'bg-green-50 text-green-600'
-                            : 'bg-[#333333] text-white hover:bg-[#5D432C]'
-                          }`}
-                      >
-                        {copySuccess ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy Content</>}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        }
 
         {/* Settings Modal */}
         {
@@ -1048,5 +1101,7 @@ const App: React.FC = () => {
     </div >
   );
 };
+
+
 
 export default App;
