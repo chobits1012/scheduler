@@ -14,6 +14,7 @@ import { ConfigModal } from './components/ConfigModal';
 import { formatDateToLocalISO, parseLocalISO } from './utils/dateUtils';
 import { ConfirmModal } from './components/ConfirmModal';
 import { QuickAddModal } from './components/QuickAddModal';
+import { HelpModal } from './components/HelpModal';
 import {
   ChevronLeft,
   ChevronRight,
@@ -104,6 +105,7 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [confirmModalState, setConfirmModalState] = useState<{
     isOpen: boolean;
     title: string;
@@ -468,10 +470,19 @@ const App: React.FC = () => {
               <button
                 onClick={handleExportIcal}
                 className="w-10 h-10 border border-[#8E8679]/30 text-[#8E8679] hover:bg-white flex items-center justify-center transition-all bg-white/20"
+                title="Export Calendar"
               >
                 <Download size={18} />
               </button>
             )}
+
+            <button
+              onClick={() => setIsHelpModalOpen(true)}
+              className="w-10 h-10 border border-[#8E8679]/30 text-[#8E8679] hover:bg-white flex items-center justify-center transition-all bg-white/20"
+              title="User Manual"
+            >
+              <div className="font-serif font-black text-lg">?</div>
+            </button>
           </div>
         </aside>
 
@@ -780,6 +791,11 @@ const App: React.FC = () => {
           jobs={jobs}
         />
 
+        <HelpModal
+          isOpen={isHelpModalOpen}
+          onClose={() => setIsHelpModalOpen(false)}
+        />
+
         {/* Settings Modal */}
         {
           isSettingsOpen && (
@@ -797,6 +813,26 @@ const App: React.FC = () => {
 
                 {/* Job List */}
                 <div className="p-8 overflow-y-auto flex-1 space-y-12">
+
+                  {/* Help Button (Mobile Only / Settings Menu) */}
+                  <div className="block md:hidden mb-8">
+                    <button
+                      onClick={() => {
+                        setIsSettingsOpen(false);
+                        setIsHelpModalOpen(true);
+                      }}
+                      className="w-full py-4 bg-amber-50 border border-amber-100 text-amber-900 rounded-xl flex items-center justify-center gap-3 font-bold shadow-sm active:scale-95 transition-all"
+                    >
+                      <div className="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center text-xs">?</div>
+                      看使用說明書 (Help)
+                    </button>
+                    <div className="flex items-center gap-4 mt-6 mb-2">
+                      <div className="h-px bg-[#F9F7F2] flex-1"></div>
+                      <span className="text-[9px] font-black text-[#8E8679] uppercase tracking-[0.3em]">Workspaces</span>
+                      <div className="h-px bg-[#F9F7F2] flex-1"></div>
+                    </div>
+                  </div>
+
                   {jobs.map((job, idx) => {
                     const theme = getColorClass(job.color, 'text');
                     const themeBg = getColorClass(job.color, 'bg');
