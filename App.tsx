@@ -260,7 +260,16 @@ const App: React.FC = () => {
   };
 
   const handleExportIcal = () => {
-    exportToIcal(shifts, jobs);
+    // Filter shifts to only include those from the current month
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+
+    const currentMonthShifts = shifts.filter(shift => {
+      const shiftDate = parseLocalISO(shift.dateStr);
+      return shiftDate.getFullYear() === currentYear && shiftDate.getMonth() === currentMonth;
+    });
+
+    exportToIcal(currentMonthShifts, jobs);
   };
 
   const handleAddJob = () => {
