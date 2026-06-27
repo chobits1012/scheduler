@@ -85,11 +85,18 @@
   <script type="module" src="/index.tsx"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('SW registered'))
-          .catch(err => console.log('SW failed', err));
-      });
+      const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      if (isLocalDev) {
+        // Dev: clear stale SW cache that can cause a blank page
+        navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
+        caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+      } else {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registered'))
+            .catch(err => console.log('SW failed', err));
+        });
+      }
     }
   </script>
 </body>

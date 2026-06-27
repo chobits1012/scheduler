@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:sheet-import": "npx tsx scripts/test-sheet-import.mjs",
+    "test:dabei-import": "npx tsx scripts/test-dabei-import.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
-import { CalendarDay, Job, Shift, JOB_A_ID, JOB_B_ID, ALL_JOBS_ID, PayType, ClipboardShift } from './types';
+import { CalendarDay, Job, Shift, JOB_A_ID, JOB_B_ID, ALL_JOBS_ID, PayType, ClipboardShift, SyncConfig, ShiftImportPreview } from './types';
 import { generateAvailabilityMessage } from './services/geminiService';
 import { ShiftModal } from './components/ShiftModal';
 import { SidebarButton, NavButton } from './components/LayoutButtons';
@@ -15,6 +15,10 @@ import { formatDateToLocalISO, parseLocalISO } from './utils/dateUtils';
 import { ConfirmModal } from './components/ConfirmModal';
 import { QuickAddModal } from './components/QuickAddModal';
 import { HelpModal } from './components/HelpModal';
+import { SyncConfigModal } from './components/SyncConfigModal';
+import { useGoogleSheets } from './hooks/useGoogleSheets';
+import { useGoogleAuth } from './hooks/useGoogleAuth';
+import { parseMonthFromSheetName } from './utils/sheetImport';
 import {
   ChevronLeft,
   ChevronRight,
@@ -39,10 +43,12 @@ import {
   CloudOff,
   LogOut,
   User as UserIcon,
+  RefreshCw,
 
   Zap,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Table
 } from 'lucide-react';
 
 // Mock Initial Data
@@ -50,7 +56,7 @@ const INITIAL_JOBS: Job[] = [
   {
     id: JOB_A_ID,
     name: '小狐狸',
-    color: 'indigo',
+    color: 'walnut',
     managerName: '陳店長',
     hourlyRate: 183,
     payType: 'hourly',
@@ -62,7 +68,7 @@ const INITIAL_JOBS: Job[] = [
   {
     id: JOB_B_ID,
     name: '開溜',
-    color: 'emerald',
+    color: 'forest',
     managerName: '林組長',
     hourlyRate: 1200,
     payType: 'perShift',
@@ -71,6 +77,14 @@ const INITIAL_JOBS: Job[] = [
     ]
   }
 ];
+
+/** Ensure default workspaces exist even if localStorage was cleared to []. */
+const normalizeJobs = (stored: Job[]): Job[] => {
+  if (stored.length === 0) return INITIAL_JOBS;
+  const ids = new Set(stored.map((j) => j.id));
+  const missing = INITIAL_JOBS.filter((j) => !ids.has(j.id));
+  return missing.length > 0 ? [...stored, ...missing] : stored;
+};
 
 const App: React.FC = () => {
   // --- State ---
@@ -91,9 +105,18 @@ const App: React.FC = () => {
     }
   }, [authError]);
 
-  // Replaced useState/useEffect with useCloudSync
-  const [jobs, setJobs, uploadJobs, downloadJobs] = useCloudSync<Job[]>(user, 'jobs', INITIAL_JOBS, 'shiftsync_jobs');
+  const [jobs, setJobs, uploadJobs, downloadJobs] = useCloudSync<Job[]>(
+    user,
+    'jobs',
+    INITIAL_JOBS,
+    'shiftsync_jobs',
+    normalizeJobs
+  );
   const [shifts, setShifts, uploadShifts, downloadShifts] = useCloudSync<Shift[]>(user, 'shifts', [], 'shiftsync_shifts');
+
+  // Google Sheets import (standalone Google OAuth, read-only)
+  const { loadShiftsFromSheet, isLoading: isSheetLoading, error: sheetError, previewShifts, previewDetails, diagnostics: sheetDiagnostics, clearPreview } = useGoogleSheets();
+  const { isLoggedIn: isGoogleLoggedIn, email: googleEmail, loading: googleAuthLoading, error: googleAuthError, login: googleLogin, logout: googleLogout } = useGoogleAuth();
 
   // UI State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -272,6 +295,40 @@ const App: React.FC = () => {
     exportToIcal(currentMonthShifts, jobs);
   };
 
+  const syncJobId = activeJobId === JOB_B_ID ? JOB_B_ID : JOB_A_ID;
+
+  const handlePreviewSheetImport = (config: SyncConfig) =>
+    loadShiftsFromSheet(config, syncJobId, currentDate.getFullYear(), jobs);
+
+  const handleImportSheetShifts = (config: SyncConfig, items: ShiftImportPreview[]) => {
+    const month =
+      syncJobId === JOB_A_ID
+        ? config.importMonth
+        : parseMonthFromSheetName(config.sheetName);
+    if (!month) return;
+    const year = currentDate.getFullYear();
+
+    const imported: Shift[] = items.map((item) => ({
+      id: crypto.randomUUID(),
+      jobId: item.selectedJobId!,
+      dateStr: item.dateStr,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      note: item.note,
+    }));
+
+    const targetJobIds = new Set(imported.map((s) => s.jobId));
+
+    setShifts((prev) => [
+      ...prev.filter((s) => {
+        if (!targetJobIds.has(s.jobId)) return true;
+        const d = new Date(s.dateStr);
+        return !(d.getFullYear() === year && d.getMonth() + 1 === month);
+      }),
+      ...imported,
+    ]);
+  };
+
   const handleAddJob = () => {
     const newJob: Job = {
       id: crypto.randomUUID(),
@@ -393,17 +450,32 @@ const App: React.FC = () => {
             />
 
             <div className="text-[9px] font-black text-[#8E8679] uppercase tracking-[0.5em] mt-8 mb-4 pl-2 opacity-40">Workspaces</div>
-            {jobs.map(job => (
-              <SidebarButton
-                key={job.id}
-                isActive={activeJobId === job.id}
-                onClick={() => setActiveJobId(job.id)}
-                icon={<Briefcase size={18} />}
-                label={job.name}
-                subLabel={job.managerName || 'Business Unit'}
-                color={job.color}
-              />
-            ))}
+            {jobs.length === 0 ? (
+              <div className="px-2 py-3 space-y-2">
+                <p className="text-[10px] text-[#8E8679] leading-relaxed">
+                  找不到工作區。本機資料可能是空的，與手機 Vercel 版不同步。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setJobs(INITIAL_JOBS)}
+                  className="w-full py-2.5 bg-[#5D432C] text-white rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-[#4a3523] transition"
+                >
+                  還原預設工作區
+                </button>
+              </div>
+            ) : (
+              jobs.map(job => (
+                <SidebarButton
+                  key={job.id}
+                  isActive={activeJobId === job.id}
+                  onClick={() => setActiveJobId(job.id)}
+                  icon={<Briefcase size={18} />}
+                  label={job.name}
+                  subLabel={job.managerName || 'Business Unit'}
+                  color={job.color}
+                />
+              ))
+            )}
 
             <button
               onClick={() => setIsSettingsOpen(true)}
@@ -414,50 +486,59 @@ const App: React.FC = () => {
           </nav>
 
           <div className="mt-8 flex gap-1 pt-8 border-t border-[#8E8679]/20">
-            {/* Sync Status / Login Button */}
-            {/* Sync Status / Manual Controls */}
-            {!user ? (
+            <div className="space-y-2 w-full mb-2">
               <button
-                onClick={login}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setIsConfigModalOpen(true);
-                }}
-                className="w-full mb-2 py-3 bg-[#333333] text-white rounded-xl flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider hover:bg-[#5D432C] transition-all"
-                title="Right-click to enter Config"
+                onClick={() => setIsSyncModalOpen(true)}
+                className="w-full py-2.5 bg-emerald-600 text-white rounded-xl flex items-center justify-center gap-2 font-bold text-[10px] uppercase tracking-wider hover:bg-emerald-700 transition"
               >
-                <CloudOff size={14} /> Login to Sync
+                <Table size={14} /> 匯入班表
               </button>
-            ) : (
-              <div className="space-y-2 w-full">
-                <div className="flex items-center gap-2 mb-2 px-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                  <span className="text-xs font-bold text-[#333333]">{user.displayName || 'User'}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={handleManualUpload}
-                    className="py-2 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 transition"
-                  >
-                    <Cloud size={14} />
-                    <span className="text-[9px] font-black uppercase">Upload</span>
-                  </button>
-                  <button
-                    onClick={handleManualDownload}
-                    className="py-2 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg flex flex-col items-center justify-center gap-1 hover:bg-blue-100 transition"
-                  >
-                    <Download size={14} />
-                    <span className="text-[9px] font-black uppercase">Download</span>
-                  </button>
-                </div>
+
+              {!user ? (
                 <button
-                  onClick={logout}
-                  className="w-full py-2 flex items-center justify-center gap-2 text-[#8E8679] hover:text-red-500 text-[10px] font-black uppercase tracking-wider transition"
+                  onClick={login}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setIsConfigModalOpen(true);
+                  }}
+                  className="w-full py-2 bg-stone-100 border border-stone-200 text-stone-600 rounded-xl flex items-center justify-center gap-2 font-bold text-[10px] uppercase tracking-wider hover:bg-stone-200 transition"
+                  title="右鍵設定 Firebase（雲端備份用）"
                 >
-                  <LogOut size={12} /> Logout
+                  <CloudOff size={14} /> 雲端備份登入
                 </button>
-              </div>
-            )}
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <span className="text-xs font-bold text-[#333333] truncate">{user.displayName || 'User'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleManualUpload}
+                      className="py-2 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 transition"
+                    >
+                      <Cloud size={14} />
+                      <span className="text-[9px] font-black uppercase">Upload</span>
+                    </button>
+                    <button
+                      onClick={handleManualDownload}
+                      className="py-2 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg flex flex-col items-center justify-center gap-1 hover:bg-blue-100 transition"
+                    >
+                      <Download size={14} />
+                      <span className="text-[9px] font-black uppercase">Download</span>
+                    </button>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="w-full py-2 flex items-center justify-center gap-2 text-[#8E8679] hover:text-red-500 text-[10px] font-black uppercase tracking-wider transition"
+                  >
+                    <LogOut size={12} /> 雲端登出
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* removed duplicate import inside firebase block */}
 
             <button
               onClick={() => setIsSettingsOpen(true)}
@@ -508,19 +589,25 @@ const App: React.FC = () => {
             </div>
             <div className="flex gap-2">
               <button
+                onClick={() => setIsSyncModalOpen(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-lg border bg-emerald-50 text-emerald-700 border-emerald-200"
+                title="匯入班表"
+              >
+                <Table size={18} />
+              </button>
+              <button
                 onClick={() => {
                   if (!user) login();
-                  else setIsSyncModalOpen(true);
                 }}
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
                 onTouchMove={handleTouchEnd}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  // Optional: also allow right click on mobile if supported
                   setIsConfigModalOpen(true);
                 }}
                 className={`w-10 h-10 flex items-center justify-center rounded-lg border transition-all ${user ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'border-[#8E8679]/20 text-[#8E8679]'}`}
+                title="雲端備份（Firebase）"
               >
                 {user ? <Cloud size={18} /> : <CloudOff size={18} />}
               </button>
@@ -805,6 +892,30 @@ const App: React.FC = () => {
           onClose={() => setIsHelpModalOpen(false)}
         />
 
+        <SyncConfigModal
+          isOpen={isSyncModalOpen}
+          onClose={() => setIsSyncModalOpen(false)}
+          onPreview={handlePreviewSheetImport}
+          onImport={handleImportSheetShifts}
+          isLoading={isSheetLoading}
+          error={sheetError}
+          previewShifts={previewShifts}
+          previewDetails={previewDetails}
+          diagnostics={sheetDiagnostics}
+          jobs={jobs}
+          jobId={syncJobId}
+          jobName={jobs.find((j) => j.id === syncJobId)?.name || (syncJobId === JOB_A_ID ? '小狐狸' : '開溜')}
+          year={currentDate.getFullYear()}
+          defaultMonth={currentDate.getMonth() + 1}
+          onClearPreview={clearPreview}
+          isGoogleLoggedIn={isGoogleLoggedIn}
+          googleEmail={googleEmail}
+          onGoogleLogin={googleLogin}
+          onGoogleLogout={googleLogout}
+          googleAuthLoading={googleAuthLoading}
+          googleAuthError={googleAuthError}
+        />
+
         {/* Settings Modal */}
         {
           isSettingsOpen && (
@@ -1066,66 +1177,7 @@ const App: React.FC = () => {
       </div >
 
       {/* Sync Modal (Mobile) */}
-      {
-        isSyncModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-[#333333]/40 backdrop-blur-sm" onClick={() => setIsSyncModalOpen(false)}></div>
-            <div className="bg-white relative w-full max-w-sm p-6 animate-slide-up shadow-lg rounded-xl overflow-hidden flex flex-col">
-              <div className="flex justify-between items-center mb-6 border-b border-[#F9F7F2] pb-4">
-                <h3 className="font-black text-lg text-[#333333] flex items-center gap-2 uppercase tracking-[0.2em]">
-                  <Cloud size={20} className="text-[#DCC7A1]" /> Sync Center
-                </h3>
-                <button onClick={() => setIsSyncModalOpen(false)} className="p-2 bg-[#F9F7F2] rounded-full hover:bg-[#8E8679]/10 transition"><X size={16} /></button>
-              </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">
-                    {user?.displayName?.[0] || 'U'}
-                  </div>
-                  <div>
-                    <div className="text-[9px] font-black uppercase text-emerald-800 tracking-wider">Logged in as</div>
-                    <div className="text-sm font-bold text-[#333333]">{user?.displayName || 'User'}</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => {
-                      setIsSyncModalOpen(false);
-                      handleManualUpload();
-                    }}
-                    className="py-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-emerald-100 transition"
-                  >
-                    <Cloud size={20} />
-                    <span className="text-[10px] font-black uppercase tracking-wider">Upload</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsSyncModalOpen(false);
-                      handleManualDownload();
-                    }}
-                    className="py-4 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg flex flex-col items-center justify-center gap-2 hover:bg-blue-100 transition"
-                  >
-                    <Download size={20} />
-                    <span className="text-[10px] font-black uppercase tracking-wider">Download</span>
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => {
-                    logout();
-                    setIsSyncModalOpen(false);
-                  }}
-                  className="w-full py-3 mt-2 flex items-center justify-center gap-2 text-[#8E8679] hover:text-red-500 hover:bg-red-50 rounded-lg transition font-bold"
-                >
-                  <LogOut size={16} /> <span className="text-xs uppercase tracking-wider">Logout</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
 
 
       <ConfigModal

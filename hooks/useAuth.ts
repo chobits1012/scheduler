@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../services/firebase';
-
 export const useAuth = () => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);

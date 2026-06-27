@@ -45,3 +45,31 @@ export interface CalendarDay {
 export const JOB_A_ID = 'job-a';
 export const JOB_B_ID = 'job-b';
 export const ALL_JOBS_ID = 'all-jobs';
+
+export interface SyncConfig {
+  spreadsheetId: string;
+  sheetName: string;
+  targetUserName: string;
+  /** 大台北格式：一個分頁含多個月，需指定匯入月份 */
+  importMonth?: number;
+}
+
+export interface ShiftImportPreview {
+  dateStr: string;
+  startTime: string;
+  endTime: string;
+  note?: string;
+  rawCell: string;
+  /** Auto-matched workspace from keyword ↔ job name. */
+  suggestedJobId?: string | null;
+  /** User-confirmed workspace (defaults to suggestedJobId when set). */
+  selectedJobId?: string;
+}
+
+export const STORAGE_KEYS = {
+  FIREBASE_CONFIG: 'shiftsync_firebase_config',
+  SYNC_CONFIG: 'shiftsync_google_sheet_config',
+  GOOGLE_ACCESS_TOKEN: 'google_access_token',
+  GOOGLE_TOKEN_EXPIRY: 'google_token_expiry',
+  GOOGLE_USER_EMAIL: 'google_user_email',
+};

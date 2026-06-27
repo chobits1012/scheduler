@@ -11,17 +11,24 @@ export const useCloudSync = <T>(
     user: User | null,
     collectionName: string, // 'jobs' or 'shifts'
     initialData: T,
-    localStorageKey: string
+    localStorageKey: string,
+    normalize?: (data: T) => T
 ): [T, (newData: T | ((prev: T) => T)) => void, () => Promise<boolean>, () => Promise<boolean>] => {
-    const [data, setData] = useState<T>(() => {
+    const loadFromStorage = (): T => {
         try {
             const saved = localStorage.getItem(localStorageKey);
-            return saved ? JSON.parse(saved) : initialData;
+            if (!saved) return initialData;
+            const parsed = JSON.parse(saved) as T;
+            return normalize ? normalize(parsed) : parsed;
         } catch (e) {
-            console.error("Failed to load local data", e);
+            console.error('Failed to load local data', e);
             return initialData;
         }
-    });
+    };
+
+    const applyNormalize = (value: T): T => (normalize ? normalize(value) : value);
+
+    const [data, setData] = useState<T>(loadFromStorage);
     const [isSynced, setIsSynced] = useState(false);
 
     // Keep a ref to the latest data so we can upload it if the cloud is empty
@@ -29,18 +36,6 @@ export const useCloudSync = <T>(
     useEffect(() => {
         dataRef.current = data;
     }, [data]);
-
-    // 1. Initial Load from LocalStorage (for offline / instant load)
-    useEffect(() => {
-        const saved = localStorage.getItem(localStorageKey);
-        if (saved) {
-            try {
-                setData(JSON.parse(saved));
-            } catch (e) {
-                console.error("Failed to parse local data", e);
-            }
-        }
-    }, [localStorageKey]);
 
     // 2. Manual Sync Functions (No detailed auto-sync listener to prevent data loss)
 
@@ -63,7 +58,7 @@ export const useCloudSync = <T>(
             const docRef = doc(db, 'users', user.uid, 'data', collectionName);
             const snapshot = await getDoc(docRef);
             if (snapshot.exists()) {
-                const cloudData = snapshot.data().value as T;
+                const cloudData = applyNormalize(snapshot.data().value as T);
                 setData(cloudData);
                 localStorage.setItem(localStorageKey, JSON.stringify(cloudData));
                 setIsSynced(true);
@@ -80,7 +75,9 @@ export const useCloudSync = <T>(
     const updateData = (newData: T | ((prev: T) => T)) => {
         setData((prev) => {
             // Handle functional update correctly
-            const resolvedValue = newData instanceof Function ? (newData as (prev: T) => T)(prev) : newData;
+            const resolvedValue = applyNormalize(
+                newData instanceof Function ? (newData as (prev: T) => T)(prev) : newData
+            );
 
             // Save resolved value to local storage
             try {
