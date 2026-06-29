@@ -156,4 +156,73 @@ if (failed > 0) {
   process.exit(1);
 }
 
+// Live 8月 API 表頭（含 col13 幽靈 時間 欄）：8/3 應對 col22，非 8/4
+const liveAugustHeader = [
+  [
+    '灰底 =  X',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '8/1 週六',
+    '',
+    '',
+    '8/2 週日',
+    '',
+    '',
+    '8/3 週一',
+    '',
+    '',
+    '8/4 週二',
+  ],
+  [
+    '',
+    '給班',
+    '排班',
+    '狀態',
+    '給班',
+    '排班',
+    '狀態',
+    '給班',
+    '排班',
+    '狀態',
+    '給班',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+  ],
+];
+const liveDayColumns = buildDayColumnMap(liveAugustHeader, 8);
+const liveFirstSix = liveDayColumns.slice(0, 4).map((d) => `${d.day}@${d.timeCol}`);
+if (liveFirstSix.join(',') !== '1@16,2@19,3@22,4@25') {
+  console.error('FAIL live 8月 header:', liveFirstSix.join(', '), 'expected 1@16,2@19,3@22,4@25');
+  process.exit(1);
+}
+console.log('OK live 8月 API header: days', liveFirstSix.join(', '));
+
 console.log('\nALL MONTHS PASS');

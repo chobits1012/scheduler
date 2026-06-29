@@ -100,11 +100,13 @@ export const scoreTripletDateAlignment = (
 ): number => {
   const { timeCol, shiftCol } = triplet;
   const dc = date.col;
-  // 時間欄精確對齊優先（6 月），再處理 8 月 (-1) 與 7 月 (+3) 的表頭偏移。
   if (timeCol === dc) return 0;
   if (timeCol === dc - 1) return 1;
-  if (timeCol === dc + 3) return 2;
-  if (shiftCol === dc) return 3;
+  // Live 8月（含給班區）：日期標題在 時間 欄右側 +3（例：時間 col13 → 8/1 col16）
+  if (timeCol + 3 === dc) return 2;
+  // 7月：時間欄在日期欄右側 +3
+  if (timeCol === dc + 3) return 3;
+  if (shiftCol === dc) return 4;
   return 10 + Math.min(Math.abs(shiftCol - dc), Math.abs(timeCol - dc));
 };
 
@@ -143,6 +145,7 @@ type FirstTripletMatchRule = {
 
 const FIRST_TRIPLET_RULES: FirstTripletMatchRule[] = [
   { name: 'exact', test: (t, d) => t.timeCol === d.col },
+  { name: 'datePlus3', test: (t, d) => t.timeCol + 3 === d.col },
   { name: 'plus3', test: (t, d) => t.timeCol === d.col + 3 },
   { name: 'minus1', test: (t, d) => t.timeCol === d.col - 1 },
   { name: 'shift', test: (t, d) => t.shiftCol === d.col },
@@ -155,8 +158,8 @@ const firstTripletRuleOrder = (
   const scheduleRow = findScheduleHeaderRow(headerRows);
   const geibanBefore = countGeibanBlocksBeforeFirstSchedule(scheduleRow);
 
-  // 6月：多個給班區塊後，首欄 時間 與日期欄同欄（exact）。
-  if (geibanBefore >= 3) return ['exact', 'plus3', 'minus1', 'shift'];
+  // 多個給班後 時間 常從 col 13 起：先試 exact（6月 stride-1），再試 datePlus3（live 8月 stride-3）。
+  if (geibanBefore >= 3) return ['exact', 'datePlus3', 'plus3', 'minus1', 'shift'];
   // 7月：少數給班區塊後，時間欄在日期欄右側 +3。
   if (geibanBefore > 0) return ['plus3', 'exact', 'minus1', 'shift'];
   // 8月：無給班、從第 1 欄起排，時間欄在日期欄左側 -1。
@@ -234,10 +237,21 @@ export const buildDayColumnMap = (
   }
 
   const startIndex = findStartDateIndex(triplets, dates, headerRows);
+
+  // Live 8月：給班區後 col13 有 時間 但 row0 無日期；col16 才是 8/1（兩欄搶同一日）。
+  // 若首欄用 datePlus3 對到 dates[0]，且次欄 exact 也對到 dates[0]，略過首欄幽靈 triplet。
+  let tripletStart = 0;
+  if (triplets.length > 1 && dates[startIndex]) {
+    const anchor = dates[startIndex];
+    const firstViaDatePlus3 = triplets[0].timeCol + 3 === anchor.col;
+    const secondExactOnAnchor = triplets[1].timeCol === anchor.col;
+    if (firstViaDatePlus3 && secondExactOnAnchor) tripletStart = 1;
+  }
+
   const result: DayColumns[] = [];
 
-  for (let i = 0; i < triplets.length; i++) {
-    const dateEntry = dates[startIndex + i];
+  for (let i = tripletStart; i < triplets.length; i++) {
+    const dateEntry = dates[startIndex + (i - tripletStart)];
     if (!dateEntry) break;
 
     const { timeCol, shiftCol, statusCol } = triplets[i];
