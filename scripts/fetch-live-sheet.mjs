@@ -12,6 +12,7 @@ import {
   parseMonthFromSheetName,
   parseUserBlockToShifts,
   detectSheetLayoutKind,
+  validateDayColumnMap,
 } from '../utils/sheetImport.ts';
 
 const SPREADSHEET_ID = '1ms4h5iJwgIhW2et2jA3e9Xynm4mf3RrGA3kAbr5Fok4';
@@ -102,9 +103,23 @@ for (let ri = 0; ri < headerRows.length; ri++) {
 
 const dayColumns = buildDayColumnMap(headerRows, month);
 const layout = detectSheetLayoutKind(headerRows, dayColumns[0]?.timeCol ?? 0);
+const dates = [];
+const DATE_HEADER_RE = /(?:\d{4}\/)?(\d{1,2})\/(\d{1,2})/;
+for (const row of headerRows) {
+  row.forEach((cell, col) => {
+    const m = (cell || '').trim().match(DATE_HEADER_RE);
+    if (!m || Number(m[1]) !== month) return;
+    const day = Number(m[2]);
+    if (!dates.some((d) => d.day === day)) dates.push({ day, col });
+  });
+}
+dates.sort((a, b) => a.col - b.col);
+const confidence = validateDayColumnMap(dayColumns, dates);
 
 console.log('\n=== PARSE RESULT ===');
-console.log('layout:', layout);
+console.log('layout:', layout, '(diagnostic only)');
+console.log('parse mode:', confidence.mode, '| date stride:', confidence.dateHeaderStride);
+if (confidence.warnings.length) console.log('warnings:', confidence.warnings.join('; '));
 console.log('first triplet timeCol:', dayColumns[0]?.timeCol);
 console.log('day map first 6:', dayColumns.slice(0, 6).map((d) => d.day).join(', '));
 

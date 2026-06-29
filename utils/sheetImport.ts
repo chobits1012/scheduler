@@ -93,6 +93,10 @@ const parseDateHeaders = (
     .map(([day, col]) => ({ day, col }));
 };
 
+const MAX_ALIGNMENT_SCORE = 4;
+/** Live / API 表頭常見：日期欄每隔 3 欄一個（8/1 col16, 8/2 col19…） */
+const VISUAL_DATE_STRIDE = 3;
+
 /** Score how well a 時間|排班|狀態 block lines up with a date header cell. Lower is better. */
 export const scoreTripletDateAlignment = (
   triplet: Omit<DayColumns, 'day'>,
@@ -102,12 +106,158 @@ export const scoreTripletDateAlignment = (
   const dc = date.col;
   if (timeCol === dc) return 0;
   if (timeCol === dc - 1) return 1;
-  // Live 8月（含給班區）：日期標題在 時間 欄右側 +3（例：時間 col13 → 8/1 col16）
+  // 日期標題在 時間 右側 +3（幽靈 時間 欄：col13 對 8/1 col16）
   if (timeCol + 3 === dc) return 2;
-  // 7月：時間欄在日期欄右側 +3
+  // 日期標題在 時間 左側 +3
   if (timeCol === dc + 3) return 3;
   if (shiftCol === dc) return 4;
   return 10 + Math.min(Math.abs(shiftCol - dc), Math.abs(timeCol - dc));
+};
+
+type Triplet = Omit<DayColumns, 'day'>;
+type DateHeader = { col: number; day: number };
+
+/** 表頭日期欄的常見間距（HTML 匯出多為 1，Sheets API 多為 3）。 */
+export const inferDateHeaderStride = (dates: DateHeader[]): number => {
+  if (dates.length < 2) return 1;
+  const strides: number[] = [];
+  for (let i = 1; i < Math.min(dates.length, 8); i++) {
+    strides.push(dates[i].col - dates[i - 1].col);
+  }
+  strides.sort((a, b) => a - b);
+  return strides[Math.floor(strides.length / 2)];
+};
+
+const isDominatedTripletAnchor = (
+  triplets: Triplet[],
+  dates: DateHeader[],
+  tripletStart: number,
+  dateStart: number
+): boolean => {
+  if (tripletStart + 1 >= triplets.length) return false;
+  const anchor = dates[dateStart];
+  const scoreHere = scoreTripletDateAlignment(triplets[tripletStart], anchor);
+  const scoreNext = scoreTripletDateAlignment(triplets[tripletStart + 1], anchor);
+  return scoreNext < scoreHere && scoreNext <= MAX_ALIGNMENT_SCORE;
+};
+
+/**
+ * 視覺配對（像眼睛看表）：每個日期找「彼此最佳」的 時間 欄。
+ * 幽靈欄（如 col13）會被略過，因為該日的最佳 triplet 是別欄。
+ */
+const matchTripletsByMutualBest = (
+  triplets: Triplet[],
+  dates: DateHeader[]
+): DayColumns[] => {
+  const tripletBest = new Map<number, { dateIndex: number; score: number }>();
+  for (let ti = 0; ti < triplets.length; ti++) {
+    let best = { dateIndex: -1, score: Infinity };
+    for (let di = 0; di < dates.length; di++) {
+      const score = scoreTripletDateAlignment(triplets[ti], dates[di]);
+      if (score < best.score) best = { dateIndex: di, score };
+    }
+    tripletBest.set(ti, best);
+  }
+
+  const dateBest = new Map<number, { tripletIndex: number; score: number }>();
+  for (let di = 0; di < dates.length; di++) {
+    let best = { tripletIndex: -1, score: Infinity };
+    for (let ti = 0; ti < triplets.length; ti++) {
+      const score = scoreTripletDateAlignment(triplets[ti], dates[di]);
+      if (score < best.score) best = { tripletIndex: ti, score };
+    }
+    dateBest.set(di, best);
+  }
+
+  const result: DayColumns[] = [];
+  for (let di = 0; di < dates.length; di++) {
+    const fromDate = dateBest.get(di);
+    if (!fromDate || fromDate.tripletIndex < 0 || fromDate.score > MAX_ALIGNMENT_SCORE) continue;
+
+    const fromTriplet = tripletBest.get(fromDate.tripletIndex);
+    if (!fromTriplet || fromTriplet.dateIndex !== di || fromTriplet.score > MAX_ALIGNMENT_SCORE) continue;
+
+    const { timeCol, shiftCol, statusCol } = triplets[fromDate.tripletIndex];
+    result.push({ day: dates[di].day, timeCol, shiftCol, statusCol });
+  }
+
+  return result.sort((a, b) => a.day - b.day);
+};
+
+const resolveSequentialTripletStart = (
+  triplets: Triplet[],
+  dates: DateHeader[],
+  dateStart: number
+): number => {
+  if (triplets.length < 2 || !dates[dateStart]) return 0;
+  const anchor = dates[dateStart];
+  const firstViaDatePlus3 = triplets[0].timeCol + 3 === anchor.col;
+  const secondExactOnAnchor = triplets[1].timeCol === anchor.col;
+  if (firstViaDatePlus3 && secondExactOnAnchor) return 1;
+  if (isDominatedTripletAnchor(triplets, dates, 0, dateStart)) return 1;
+  return 0;
+};
+
+const matchTripletsBySequentialZip = (
+  triplets: Triplet[],
+  dates: DateHeader[],
+  dateStart: number,
+  tripletStart: number
+): DayColumns[] => {
+  const result: DayColumns[] = [];
+  for (let i = tripletStart; i < triplets.length; i++) {
+    const dateEntry = dates[dateStart + (i - tripletStart)];
+    if (!dateEntry) break;
+    const { timeCol, shiftCol, statusCol } = triplets[i];
+    result.push({ day: dateEntry.day, timeCol, shiftCol, statusCol });
+  }
+  return result;
+};
+
+export type DayColumnMapMode = 'visual' | 'sequential';
+
+export type DayColumnMapConfidence = {
+  mode: DayColumnMapMode;
+  dateHeaderStride: number;
+  dayCount: number;
+  firstDay: number | null;
+  lastDay: number | null;
+  warnings: string[];
+};
+
+/** 匯入後自檢：日期是否連續、欄位是否合理。 */
+export const validateDayColumnMap = (
+  dayColumns: DayColumns[],
+  dates: DateHeader[]
+): DayColumnMapConfidence => {
+  const warnings: string[] = [];
+  const dateHeaderStride = inferDateHeaderStride(dates);
+
+  if (dayColumns.length === 0) {
+    warnings.push('未對應到任何日期欄');
+  }
+
+  for (let i = 1; i < dayColumns.length; i++) {
+    if (dayColumns[i].day !== dayColumns[i - 1].day + 1) {
+      warnings.push(`日期不連續：${dayColumns[i - 1].day} 日後接 ${dayColumns[i].day} 日`);
+      break;
+    }
+  }
+
+  const tripletStride =
+    dayColumns.length >= 2 ? dayColumns[1].timeCol - dayColumns[0].timeCol : null;
+  if (tripletStride !== null && tripletStride !== 3) {
+    warnings.push(`時間欄間距為 ${tripletStride}（預期 3）`);
+  }
+
+  return {
+    mode: dateHeaderStride >= VISUAL_DATE_STRIDE ? 'visual' : 'sequential',
+    dateHeaderStride,
+    dayCount: dayColumns.length,
+    firstDay: dayColumns[0]?.day ?? null,
+    lastDay: dayColumns.at(-1)?.day ?? null,
+    warnings,
+  };
 };
 
 const countGeibanBlocksBeforeFirstSchedule = (row: string[]): number => {
@@ -158,11 +308,11 @@ const firstTripletRuleOrder = (
   const scheduleRow = findScheduleHeaderRow(headerRows);
   const geibanBefore = countGeibanBlocksBeforeFirstSchedule(scheduleRow);
 
-  // 多個給班後 時間 常從 col 13 起：先試 exact（6月 stride-1），再試 datePlus3（live 8月 stride-3）。
+  // 多個給班後 時間 常從 col 13 起：先試 exact，再試 datePlus3（live API 幽靈欄）
   if (geibanBefore >= 3) return ['exact', 'datePlus3', 'plus3', 'minus1', 'shift'];
-  // 7月：少數給班區塊後，時間欄在日期欄右側 +3。
+  // 少數給班區塊後，時間欄常在日期欄右側 +3
   if (geibanBefore > 0) return ['plus3', 'exact', 'minus1', 'shift'];
-  // 8月：無給班、從第 1 欄起排，時間欄在日期欄左側 -1。
+  // 無給班、從第 1 欄起排，時間欄常在日期欄左側 -1
   if (firstTimeCol <= 5) return ['minus1', 'exact', 'plus3', 'shift'];
   return ['plus3', 'exact', 'minus1', 'shift'];
 };
@@ -199,7 +349,7 @@ export const findStartDateIndex = (
 
 export type SheetLayoutKind = 'june' | 'july' | 'august';
 
-/** 依表頭判斷月份版面（開溜製造所班表常見三種）。 */
+/** 依表頭判斷版面（診斷用；解析不再依賴此值）。 */
 export const detectSheetLayoutKind = (
   headerRows: string[][],
   firstTimeCol: number
@@ -218,7 +368,7 @@ export const buildDayColumnMap = (
 ): DayColumns[] => {
   if (headerRows.length === 0) return [];
 
-  let triplets: Omit<DayColumns, 'day'>[] = [];
+  let triplets: Triplet[] = [];
   for (const row of headerRows) {
     const found = collectScheduleTriplets(row);
     if (found.length > triplets.length) triplets = found;
@@ -236,34 +386,17 @@ export const buildDayColumnMap = (
     }));
   }
 
-  const startIndex = findStartDateIndex(triplets, dates, headerRows);
+  const dateStride = inferDateHeaderStride(dates);
 
-  // Live 8月：給班區後 col13 有 時間 但 row0 無日期；col16 才是 8/1（兩欄搶同一日）。
-  // 若首欄用 datePlus3 對到 dates[0]，且次欄 exact 也對到 dates[0]，略過首欄幽靈 triplet。
-  let tripletStart = 0;
-  if (triplets.length > 1 && dates[startIndex]) {
-    const anchor = dates[startIndex];
-    const firstViaDatePlus3 = triplets[0].timeCol + 3 === anchor.col;
-    const secondExactOnAnchor = triplets[1].timeCol === anchor.col;
-    if (firstViaDatePlus3 && secondExactOnAnchor) tripletStart = 1;
+  // Sheets API：日期欄 stride=3 → 每個日期獨立對齊下方 時間 欄（不需知道是幾月）
+  if (dateStride >= VISUAL_DATE_STRIDE) {
+    return matchTripletsByMutualBest(triplets, dates);
   }
 
-  const result: DayColumns[] = [];
-
-  for (let i = tripletStart; i < triplets.length; i++) {
-    const dateEntry = dates[startIndex + (i - tripletStart)];
-    if (!dateEntry) break;
-
-    const { timeCol, shiftCol, statusCol } = triplets[i];
-    result.push({
-      day: dateEntry.day,
-      timeCol,
-      shiftCol,
-      statusCol,
-    });
-  }
-
-  return result;
+  // HTML 匯出：日期欄 stride=1 → 日曆索引與 triplet 序列對齊
+  const dateStart = findStartDateIndex(triplets, dates, headerRows);
+  const tripletStart = resolveSequentialTripletStart(triplets, dates, dateStart);
+  return matchTripletsBySequentialZip(triplets, dates, dateStart, tripletStart);
 };
 
 export interface SheetImportDiagnostics {

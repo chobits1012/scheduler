@@ -225,4 +225,73 @@ if (liveFirstSix.join(',') !== '1@16,2@19,3@22,4@25') {
 }
 console.log('OK live 8月 API header: days', liveFirstSix.join(', '));
 
+// 9月/10月若沿用 live API 模板（日期 stride=3），視覺配對應自動正確
+const liveSeptemberHeader = [
+  [
+    '灰底 =  X',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '9/1 週二',
+    '',
+    '',
+    '9/2 週三',
+    '',
+    '',
+    '9/3 週四',
+    '',
+    '',
+    '9/4 週五',
+  ],
+  [
+    '',
+    '給班',
+    '排班',
+    '狀態',
+    '給班',
+    '排班',
+    '狀態',
+    '給班',
+    '排班',
+    '狀態',
+    '給班',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+    '時間',
+    '排班',
+    '狀態',
+  ],
+];
+const sepDayColumns = buildDayColumnMap(liveSeptemberHeader, 9);
+const sepFirstFour = sepDayColumns.slice(0, 4).map((d) => `${d.day}@${d.timeCol}`);
+if (sepFirstFour.join(',') !== '1@16,2@19,3@22,4@25') {
+  console.error('FAIL live 9月 template:', sepFirstFour.join(', '), 'expected 1@16,2@19,3@22,4@25');
+  process.exit(1);
+}
+console.log('OK live 9月 template (future months): days', sepFirstFour.join(', '));
+
 console.log('\nALL MONTHS PASS');
