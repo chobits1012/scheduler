@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:sheet-import": "npx tsx scripts/test-sheet-import.mjs",
-    "test:dabei-import": "npx tsx scripts/test-dabei-import.mjs"
+    "test:dabei-import": "npx tsx scripts/test-dabei-import.mjs",
+    "test:all-month-import": "npx tsx scripts/test-all-month-import.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.31.0",

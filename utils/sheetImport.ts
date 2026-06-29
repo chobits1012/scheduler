@@ -58,9 +58,6 @@ export interface DayColumns {
   statusCol: number;
 }
 
-/** Company sheet: first 時間|排班|狀態 block is July 3, not July 1. */
-const SCHEDULE_DAY_OFFSET = 2;
-
 const collectScheduleTriplets = (row: string[]): Omit<DayColumns, 'day'>[] => {
   const result: Omit<DayColumns, 'day'>[] = [];
   for (let col = 0; col < row.length - 2; col++) {
@@ -74,9 +71,147 @@ const collectScheduleTriplets = (row: string[]): Omit<DayColumns, 'day'>[] => {
   return result;
 };
 
+const parseDateHeaders = (
+  headerRows: string[][],
+  expectedMonth: number
+): { col: number; day: number }[] => {
+  const byDay = new Map<number, number>();
+
+  for (const row of headerRows) {
+    row.forEach((cell, col) => {
+      const match = normalizeHeaderCell(cell).match(DATE_HEADER_RE);
+      if (!match) return;
+      const month = Number(match[1]);
+      const day = Number(match[2]);
+      if (month !== expectedMonth || day < 1 || day > 31) return;
+      if (!byDay.has(day)) byDay.set(day, col);
+    });
+  }
+
+  return [...byDay.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .map(([day, col]) => ({ day, col }));
+};
+
+/** Score how well a 時間|排班|狀態 block lines up with a date header cell. Lower is better. */
+export const scoreTripletDateAlignment = (
+  triplet: Omit<DayColumns, 'day'>,
+  date: { col: number; day: number }
+): number => {
+  const { timeCol, shiftCol } = triplet;
+  const dc = date.col;
+  // 時間欄精確對齊優先（6 月），再處理 8 月 (-1) 與 7 月 (+3) 的表頭偏移。
+  if (timeCol === dc) return 0;
+  if (timeCol === dc - 1) return 1;
+  if (timeCol === dc + 3) return 2;
+  if (shiftCol === dc) return 3;
+  return 10 + Math.min(Math.abs(shiftCol - dc), Math.abs(timeCol - dc));
+};
+
+const countGeibanBlocksBeforeFirstSchedule = (row: string[]): number => {
+  let count = 0;
+  for (let col = 0; col < row.length - 2; col++) {
+    const a = normalizeHeaderCell(row[col]);
+    const b = normalizeHeaderCell(row[col + 1]);
+    const c = normalizeHeaderCell(row[col + 2]);
+    if (a === '給班' && b === '排班' && c === '狀態') {
+      count++;
+      continue;
+    }
+    if (a === '時間' && b === '排班' && c === '狀態') break;
+  }
+  return count;
+};
+
+const findScheduleHeaderRow = (headerRows: string[][]): string[] => {
+  let bestRow: string[] = headerRows[0] || [];
+  let bestCount = 0;
+  for (const row of headerRows) {
+    const count = collectScheduleTriplets(row).length;
+    if (count > bestCount) {
+      bestCount = count;
+      bestRow = row;
+    }
+  }
+  return bestRow;
+};
+
+type FirstTripletMatchRule = {
+  name: string;
+  test: (triplet: Omit<DayColumns, 'day'>, date: { col: number }) => boolean;
+};
+
+const FIRST_TRIPLET_RULES: FirstTripletMatchRule[] = [
+  { name: 'exact', test: (t, d) => t.timeCol === d.col },
+  { name: 'plus3', test: (t, d) => t.timeCol === d.col + 3 },
+  { name: 'minus1', test: (t, d) => t.timeCol === d.col - 1 },
+  { name: 'shift', test: (t, d) => t.shiftCol === d.col },
+];
+
+const firstTripletRuleOrder = (
+  headerRows: string[][],
+  firstTimeCol: number
+): FirstTripletMatchRule['name'][] => {
+  const scheduleRow = findScheduleHeaderRow(headerRows);
+  const geibanBefore = countGeibanBlocksBeforeFirstSchedule(scheduleRow);
+
+  // 6月：多個給班區塊後，首欄 時間 與日期欄同欄（exact）。
+  if (geibanBefore >= 3) return ['exact', 'plus3', 'minus1', 'shift'];
+  // 7月：少數給班區塊後，時間欄在日期欄右側 +3。
+  if (geibanBefore > 0) return ['plus3', 'exact', 'minus1', 'shift'];
+  // 8月：無給班、從第 1 欄起排，時間欄在日期欄左側 -1。
+  if (firstTimeCol <= 5) return ['minus1', 'exact', 'plus3', 'shift'];
+  return ['plus3', 'exact', 'minus1', 'shift'];
+};
+
+/** Find where the first schedule block starts on the month timeline. */
+export const findStartDateIndex = (
+  triplets: Omit<DayColumns, 'day'>[],
+  dates: { col: number; day: number }[],
+  headerRows: string[][]
+): number => {
+  if (dates.length === 0 || triplets.length === 0) return 0;
+
+  const firstTriplet = triplets[0];
+  const ruleOrder = firstTripletRuleOrder(headerRows, firstTriplet.timeCol);
+
+  for (const ruleName of ruleOrder) {
+    const rule = FIRST_TRIPLET_RULES.find((r) => r.name === ruleName);
+    if (!rule) continue;
+    const index = dates.findIndex((date) => rule.test(firstTriplet, date));
+    if (index >= 0) return index;
+  }
+
+  let bestIndex = 0;
+  let bestScore = Infinity;
+  for (let i = 0; i < dates.length; i++) {
+    const score = scoreTripletDateAlignment(firstTriplet, dates[i]);
+    if (score < bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+};
+
+export type SheetLayoutKind = 'june' | 'july' | 'august';
+
+/** 依表頭判斷月份版面（開溜製造所班表常見三種）。 */
+export const detectSheetLayoutKind = (
+  headerRows: string[][],
+  firstTimeCol: number
+): SheetLayoutKind => {
+  const scheduleRow = findScheduleHeaderRow(headerRows);
+  const geibanBefore = countGeibanBlocksBeforeFirstSchedule(scheduleRow);
+  if (geibanBefore >= 3) return 'june';
+  if (geibanBefore > 0) return 'july';
+  if (firstTimeCol <= 5) return 'august';
+  return 'july';
+};
+
 export const buildDayColumnMap = (
   headerRows: string[][],
-  _expectedMonth: number
+  expectedMonth: number
 ): DayColumns[] => {
   if (headerRows.length === 0) return [];
 
@@ -88,14 +223,31 @@ export const buildDayColumnMap = (
 
   if (triplets.length === 0) return [];
 
+  const dates = parseDateHeaders(headerRows, expectedMonth);
+  if (dates.length === 0) {
+    return triplets.map(({ timeCol, shiftCol, statusCol }, index) => ({
+      day: index + 1,
+      timeCol,
+      shiftCol,
+      statusCol,
+    }));
+  }
+
+  const startIndex = findStartDateIndex(triplets, dates, headerRows);
   const result: DayColumns[] = [];
 
-  triplets.forEach(({ timeCol, shiftCol, statusCol }, index) => {
-    const day = index + 1 + SCHEDULE_DAY_OFFSET;
-    if (day < 1 || day > 31) return;
+  for (let i = 0; i < triplets.length; i++) {
+    const dateEntry = dates[startIndex + i];
+    if (!dateEntry) break;
 
-    result.push({ day, timeCol, shiftCol, statusCol });
-  });
+    const { timeCol, shiftCol, statusCol } = triplets[i];
+    result.push({
+      day: dateEntry.day,
+      timeCol,
+      shiftCol,
+      statusCol,
+    });
+  }
 
   return result;
 };
